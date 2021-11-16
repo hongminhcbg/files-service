@@ -1,4 +1,7 @@
 # files-service
+Demo: 
+ ![alt text](https://github.com/hongminhcbg/files-service/blob/main/images/demo.gif?raw=true)
+
 I. Overview
 
 ![alt text](https://github.com/hongminhcbg/files-service/blob/main/images/over.png?raw=true)
