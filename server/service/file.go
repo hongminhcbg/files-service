@@ -1,14 +1,17 @@
 package service
 
 import (
-	"cloud.google.com/go/storage"
 	"context"
+	"file-service/store"
 	"fmt"
-	"github.com/go-redis/redis/v8"
-	"github.com/google/uuid"
 	"io"
 	"log"
+	"strconv"
 	"time"
+
+	"cloud.google.com/go/storage"
+	"github.com/go-redis/redis/v8"
+	"github.com/google/uuid"
 
 	"net/http"
 )
@@ -18,12 +21,14 @@ const filename = "test.tar.gz"
 type FileService struct {
 	redisCli *redis.Client
 	bucket   *storage.BucketHandle
+	store    store.IStore
 }
 
-func NewFileService(redisCli *redis.Client, bucket *storage.BucketHandle) *FileService {
+func NewFileService(redisCli *redis.Client, bucket *storage.BucketHandle, s store.IStore) *FileService {
 	return &FileService{
 		redisCli: redisCli,
 		bucket:   bucket,
+		store:    s,
 	}
 }
 
@@ -81,4 +86,27 @@ func (s *FileService) DownloadStreaming(w http.ResponseWriter, r *http.Request) 
 	//attachment file, browser will handler that
 	w.Header().Set("Content-Disposition", "attachment; filename=test.tar.gz")
 	io.Copy(w, fileReader)
+}
+
+func (s *FileService) ViewFile(w http.ResponseWriter, r *http.Request) {
+	queries := r.URL.Query()
+	idStr2 := queries.Get("id")
+	if len(idStr2) == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"message":"not ok"}`))
+		return
+	}
+
+	idInt, _ := strconv.Atoi(idStr2)
+	template, err := s.store.GetTemplateById(context.Background(), int64(idInt))
+	if err != nil || template == nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"message":"not ok"}`))
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	w.WriteHeader(http.StatusOK)
+	w.Write(template.Content)
+	return
 }

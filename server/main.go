@@ -1,12 +1,17 @@
 package main
 
 import (
-	"cloud.google.com/go/storage"
 	"context"
 	"file-service/conf"
 	"file-service/service"
-	"github.com/go-redis/redis/v8"
+	"file-service/store"
 	"net/http"
+
+	"cloud.google.com/go/storage"
+	"github.com/go-redis/redis/v8"
+
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -30,11 +35,21 @@ func main() {
 	defer bucket.Close()
 
 	bucketHandle := bucket.Bucket(cfg.GcpBucketName)
-	fileService := service.NewFileService(redisCli, bucketHandle)
+	db := mustConnectMysql(cfg.MySqlUrl)
+	s := store.NewStore(db)
+	fileService := service.NewFileService(redisCli, bucketHandle, s)
 
 	http.HandleFunc("/generate_download_id", fileService.GenerateDownloadId)
 	http.HandleFunc("/download", fileService.DownloadStreaming)
+	http.HandleFunc("/views", fileService.ViewFile)
 	http.ListenAndServe("0.0.0.0:8080", nil)
 }
 
+func mustConnectMysql(dsn string) *gorm.DB {
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		panic(err)
+	}
 
+	return db
+}
